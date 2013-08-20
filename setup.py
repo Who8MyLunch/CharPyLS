@@ -45,14 +45,14 @@ version = '1.0.0'
 setup(name='CharPyLS',
       packages=find_packages(),
       package_data={'': ['*.txt', '*.cpp', '*.h', '*.pyx']},
-      cmdclass={'build_ext':build_ext},
+      cmdclass={'build_ext': build_ext},
       ext_modules=[ ext ],
 
       # Metadata
       version=version,
-      license='FreeBSD',
+      license='MIT',
       author='Pierre V. Villeneuve',
       author_email='pierre.villeneuve@gmail.com',
       description='JPEG-LS for Python via CharLS C++ Library,
-      url='https://github.com/Who8MyLunch',
+      url='https://github.com/Who8MyLunch/CharPyLS',
       )
