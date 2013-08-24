@@ -26,9 +26,11 @@ class Test_Jpeg_LS(unittest.TestCase):
     def test_encode_uint8(self):
         data, meta = io.read(self.fname)
 
+
         data_comp = jls.encode(data)
 
-        self.assertTrue(data_comp.size == 2088375)
+        msg = 'oops size={:d}'.format(data_comp.size)
+        self.assertTrue(data_comp.size < 2090000, msg)
 
 
     def test_encode_uint16(self):
@@ -36,7 +38,8 @@ class Test_Jpeg_LS(unittest.TestCase):
 
         data_comp = jls.encode(data)
 
-        self.assertTrue(data_comp.size == 2732889)
+        msg = 'oops size={:d}'.format(data_comp.size)
+        self.assertTrue(data_comp.size < 2740000, msg)
 
 
     def test_encode_uint16_squeeze(self):
@@ -45,7 +48,8 @@ class Test_Jpeg_LS(unittest.TestCase):
         data = data.squeeze()
         data_comp = jls.encode(data)
 
-        self.assertTrue(data_comp.size == 2732889)
+        msg = 'oops size={:d}'.format(data_comp.size)
+        self.assertTrue(data_comp.size < 2740000, msg)
 
 
     def test_encode_band_resid(self):
@@ -54,7 +58,8 @@ class Test_Jpeg_LS(unittest.TestCase):
         data = data.squeeze()
         data_comp = jls.encode(data)
 
-        self.assertTrue(data_comp.size == 23929)
+        msg = 'oops size={:d}'.format(data_comp.size)
+        self.assertTrue(data_comp.size < 24000, msg)
 
 
     def test_encode_to_file(self):
@@ -64,7 +69,8 @@ class Test_Jpeg_LS(unittest.TestCase):
         jls.write(fname_temp, data)
 
         file_size = os.path.getsize(fname_temp)
-        self.assertTrue(file_size == 2088375)
+        msg = 'oops file_size={:d}'.format(file_size)
+        self.assertTrue(file_size < 2090000, msg)
 
 
     def test_read_header(self):
