@@ -20,12 +20,15 @@ class Test_Jpeg_LS(unittest.TestCase):
 
 
     def tearDown(self):
-        pass
+
+        f = 'data_temp.jls'
+        if os.path.isfile(f):
+            os.remove(f)
+
 
 
     def test_encode_uint8(self):
         data, meta = io.read(self.fname)
-
 
         data_comp = jls.encode(data)
 
