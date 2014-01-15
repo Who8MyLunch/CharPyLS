@@ -116,7 +116,8 @@ def encode(data_image):
     elif data_image.dtype == np.uint16:
         Bpp = 2
     else:
-        raise Exception('Invalid input data type %s' % data_image.dtype)
+        msg = 'Invalid input data type %s, expecting np.uint8 or np.uint16.' % data_image.dtype
+        raise Exception(msg)
 
     if len(data_image.shape) < 2 or len(data_image.shape) > 3:
         raise Exception('Invalid data shape')
@@ -137,10 +138,10 @@ def encode(data_image):
     cdef int max_val = np.max(data_image)
     cdef int max_bits = 0
     max_bits = int(np.ceil( np.log2(max_val + 1) ))
-    
+
     if max_bits <= 1:
         max_bits = 2
-   
+
     # Setup parameter structure.
     cdef JlsParameters info = build_parameters()
 
