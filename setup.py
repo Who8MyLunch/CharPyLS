@@ -1,5 +1,5 @@
 
-import os
+
 import numpy as np
 import setuptools
 
@@ -18,14 +18,13 @@ include_dirs = ['jpeg_ls/CharLS_src',
                 setuptools.distutils.sysconfig.get_python_inc(),
                 np.get_include()]
 
-if os.name == 'nt':
+extra_link_args = []
+
+flag_MSVC = False  # Set this flag to True if using Visual Studio.
+if flag_MSVC:
     extra_compile_args = ['/EHsc']
-    extra_link_args = []
-elif os.name == 'posix':
-    extra_link_args = []
-    extra_compile_args = []
 else:
-    raise ValueError('Unknown os: {:s}'.format(os.name))
+    extra_compile_args = []
 
 # These next two lines are left over from when I was playing with MinGW64 on my Windows PC.
 # extra_compile_args = ['-m64'] #, '-nostdlib', '-lgcc']
@@ -38,7 +37,7 @@ ext = Extension('_CharLS', source_files,
                 extra_link_args=extra_link_args)
 
 # Do it.
-version = '1.0.0'
+version = '1.0.1'
 
 setup(name='CharPyLS',
       packages=find_packages(),
