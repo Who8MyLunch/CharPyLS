@@ -20,7 +20,7 @@ include_dirs = ['jpeg_ls/CharLS_src',
 
 extra_link_args = []
 
-flag_MSVC = False  # Set this flag to True if using Visual Studio.
+flag_MSVC = True  # Set this flag to True if using Visual Studio.
 if flag_MSVC:
     extra_compile_args = ['/EHsc']
 else:
@@ -37,7 +37,7 @@ ext = Extension('_CharLS', source_files,
                 extra_link_args=extra_link_args)
 
 # Do it.
-version = '1.0.1'
+version = '1.0.2'
 
 setup(name='CharPyLS',
       packages=find_packages(),
