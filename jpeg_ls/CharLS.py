@@ -1,5 +1,5 @@
 
-from __future__ import division, print_function, unicode_literals
+
 
 import numpy as np
 
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     """
 
     import os
-    import data_io
+    from . import data_io
 
     # # data prep.
     # path = os.path.dirname(os.path.abspath(__file__))
