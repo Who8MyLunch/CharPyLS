@@ -106,7 +106,7 @@ cdef JlsParameters build_parameters():
 
 def encode(data_image):
     """
-    Encode grey-scale image via JPEG-LS using CharLS implementation.
+    Encode image via JPEG-LS using CharLS implementation.
     """
 
     data_image = np.asarray(data_image)
@@ -131,7 +131,7 @@ def encode(data_image):
     else:
         num_bands = data_image.shape[2]
 
-    if num_bands != 1:
+    if num_bands > 3:
         raise Exception('Invalid number of bands %s' % num_bands)
 
 
@@ -148,15 +148,19 @@ def encode(data_image):
     info.width = num_samples
     info.height = num_lines
     info.components = num_bands
-    info.ilv = <interleavemode>0
+    if num_bands == 1:
+        info.ilv = <interleavemode>0
+    else:
+        info.ilv = <interleavemode>1
 
-    info.bytesperline = num_samples * Bpp
+
+    info.bytesperline = num_bands * num_samples * Bpp
     info.bitspersample = max_bits
 
     info.allowedlossyerror = 0
 
     # Buffer to store compressed data results.
-    cdef size_t size_buffer = num_samples*num_lines*Bpp*2
+    cdef size_t size_buffer = num_bands*num_samples*num_lines*Bpp*2
 
     data_buffer = np.zeros(size_buffer, dtype=np.uint8)
     cdef char* data_buffer_ptr = <char*>np.PyArray_DATA(data_buffer)
@@ -169,7 +173,7 @@ def encode(data_image):
     cdef size_t* size_work_ptr = &size_work
 
     # Call encoder function.
-    cdef size_t size_data = num_samples*num_lines*Bpp
+    cdef size_t size_data = num_bands*num_samples*num_lines*Bpp
     cdef JLS_ERROR err
     err = JpegLsEncode(data_buffer_ptr, size_buffer, size_work_ptr,
                        data_image_ptr, size_data, info_ptr)

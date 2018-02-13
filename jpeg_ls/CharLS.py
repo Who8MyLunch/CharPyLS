@@ -38,7 +38,7 @@ def write(fname, data_image):
 
 def encode(data_image):
     """
-    Encode grey-scale image via JPEG-LS using CharLS implementation.
+    Encode image via JPEG-LS using CharLS implementation.
     """
 
     if data_image.dtype == np.uint16 and np.max(data_image) <= 255:
@@ -52,7 +52,7 @@ def encode(data_image):
 
 def decode(data_buffer):
     """
-    Decode grey-scale image via JPEG-LS using CharLS implementation.
+    Decode image via JPEG-LS using CharLS implementation.
     """
 
     data_image = _CharLS.decode(data_buffer)
