@@ -1,11 +1,9 @@
-
-
-import numpy as np
+import os
 import setuptools
-
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 
+import numpy as np
 from Cython.Distutils import build_ext
 
 # Cython extension.
@@ -20,8 +18,11 @@ include_dirs = ['jpeg_ls/CharLS_src',
 
 extra_link_args = []
 
-flag_MSVC = True  # Set this flag to True if using Visual Studio.
-if flag_MSVC:
+if 'MSCV' in os.environ and os.environ['MSCV'] == 'False':
+    flag_MSCV = False
+else:
+    flag_MSCV = True
+if flag_MSCV:
     extra_compile_args = ['/EHsc']
 else:
     extra_compile_args = []
