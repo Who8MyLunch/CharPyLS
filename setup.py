@@ -22,7 +22,7 @@ include_dirs = ['jpeg_ls/CharLS_src',
 
 # Platform-specific arguments
 if sys.platform == "win32":
-    extra_compile_args = ['/EHsc']
+    extra_compile_args = []  # ['/EHsc']
     extra_link_args = []
 elif sys.platform == "darwin":
     extra_compile_args = []
