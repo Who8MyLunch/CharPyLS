@@ -6,8 +6,6 @@ import unittest
 import numpy as np
 from jpeg_ls import data_io
 
-import context
-
 import jpeg_ls as jls
 import jpeg_ls.CharLS
 
