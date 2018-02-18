@@ -116,7 +116,7 @@ def encode(data_image):
     elif data_image.dtype == np.uint16:
         Bpp = 2
     else:
-        msg = 'Invalid input data type %s, expecting np.uint8 or np.uint16.' % data_image.dtype
+        msg = 'Invalid input data type {}, expecting np.uint8 or np.uint16.'.format(data_image.dtype)
         raise Exception(msg)
 
     if len(data_image.shape) < 2 or len(data_image.shape) > 3:
@@ -132,7 +132,7 @@ def encode(data_image):
         num_bands = data_image.shape[2]
 
     if num_bands != 1:
-        raise Exception('Invalid number of bands %s' % num_bands)
+        raise Exception('Invalid number of bands {}'.format(num_bands))
 
 
     cdef int max_val = np.max(data_image)
@@ -175,7 +175,7 @@ def encode(data_image):
                        data_image_ptr, size_data, info_ptr)
 
     if err != 0:
-        raise Exception('Error calling CharLS: %s' % JLS_ERROR_MESSAGES[err])
+        raise Exception('Error calling CharLS: {}'.format(JLS_ERROR_MESSAGES[err]))
 
     # Finish.
     data_buffer = data_buffer[:size_work]
@@ -209,7 +209,7 @@ cdef JlsParameters _read_header(np.ndarray[np.uint8_t, ndim=1] data_buffer):
     err = JpegLsReadHeader(data_buffer_ptr, size_buffer, info_ptr)
 
     if err != 0:
-        raise Exception('Error calling CharLS: %s' % JLS_ERROR_MESSAGES[err])
+        raise Exception('Error calling CharLS: {}'.format(JLS_ERROR_MESSAGES[err]))
 
     # Done.
     return info #data_image
@@ -245,7 +245,7 @@ def decode(np.ndarray[np.uint8_t, ndim=1] data_buffer):
     elif 9 <= info.bitspersample <= 16:
         Bpp = 2
     else:
-        raise Exception('Invalid bitspersample: %s' % info.bitspersample)
+        raise Exception('Invalid bitspersample: {}'.format(info.bitspersample))
 
     cdef int size_buffer = data_buffer.shape[0]
 
@@ -263,7 +263,7 @@ def decode(np.ndarray[np.uint8_t, ndim=1] data_buffer):
                        data_buffer_ptr, size_buffer, info_ptr)
 
     if err != 0:
-        raise Exception('Error calling CharLS: %s' % JLS_ERROR_MESSAGES[err])
+        raise Exception('Error calling CharLS: {}'.format(JLS_ERROR_MESSAGES[err]))
 
     # Finish.
     num_samples = info.width
