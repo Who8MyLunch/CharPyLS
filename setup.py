@@ -37,7 +37,7 @@ ext = Extension('_CharLS', source_files,
                 extra_link_args=extra_link_args)
 
 # Do it.
-version = '1.0.2'
+version = '1.1.0'
 
 setup(name='CharPyLS',
       packages=find_packages(),
