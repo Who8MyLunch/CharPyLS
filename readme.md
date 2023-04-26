@@ -1,6 +1,10 @@
 
 # CharPyLS
 
+_Note_:
+This is a fork of the [original repository](https://github.com/Who8MyLunch/CharPyLS) created
+to be able to add fixes and adaptions, as that repo seems not to be maintained anymore.
+
 ## JPEG-LS for Python via CharLS C++ Library
 
 
