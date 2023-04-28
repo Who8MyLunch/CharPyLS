@@ -42,9 +42,9 @@ ext = Extension('_CharLS', source_files,
                 extra_link_args=extra_link_args)
 
 # Do it.
-version = '1.0.3'
+version = '1.0.4'
 
-setup(name='CharPyLS',
+setup(name='pyjpegls',
       packages=find_packages(),
       package_data={'': ['*.txt', '*.cpp', '*.h', '*.pyx']},
       cmdclass={'build_ext': build_ext},
@@ -56,4 +56,4 @@ setup(name='CharPyLS',
       author='Pierre V. Villeneuve',
       author_email='pierre.villeneuve@gmail.com',
       description='JPEG-LS for Python via CharLS C++ Library',
-      url='https://github.com/Who8MyLunch/CharPyLS')
+      url='https://github.com/pydicom/pyjpegls')

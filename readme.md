@@ -1,12 +1,12 @@
 
-# CharPyLS
+# pyjpegls
 
-_Note_:
-This is a fork of the [original repository](https://github.com/Who8MyLunch/CharPyLS) created
-to be able to add fixes and adaptions, as that repo seems not to be maintained anymore.
+> **Note**
+> This is a fork of the [original CharPyLS repository](https://github.com/Who8MyLunch/CharPyLS) created
+> to be able to add fixes and adaptions, as that repo is not maintained anymore. The rest
+> of this file is unchanged from the original readme. 
 
 ## JPEG-LS for Python via CharLS C++ Library
-
 
 I wrote this interface to enable easy access to the awesome [JPEG-LS](http://en.wikipedia.org/wiki/Lossless_JPEG) lossless image compression algorithm from within my Python application.  I had no need to read/write anyone else's JPEG-LS image files, but rather I needed to compress some data structures internal to my application.  This data was similar in nature to greyscale imagery such that it was an easy choice to leverage the existing CharLS C++ library I found on [codeplex.com](http://www.codeplex.com).  I did eventually incorporate some basic file I/O functionality for my unit tests, and that's why I list Pillow below as a dependency.
 

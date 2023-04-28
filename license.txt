@@ -1,5 +1,5 @@
 
-CharPyLS - JPEG-LS for Python via CharLS C++ Library
+pyjpegls - JPEG-LS for Python via CharLS C++ Library
 
 The MIT License (MIT)
 
