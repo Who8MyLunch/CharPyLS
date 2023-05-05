@@ -1,7 +1,7 @@
 
 # pyjpegls
 
-> **Note**
+> **Note**  
 > This is a fork of the [original CharPyLS repository](https://github.com/Who8MyLunch/CharPyLS) created
 > to be able to add fixes and adaptions, as that repo is not maintained anymore. The rest
 > of this file is unchanged from the original readme. 

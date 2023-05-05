@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+authors = [
+    {name = "Pierre V. Villeneuve", email = "pierre.villeneuve@gmail.com"},
+    {name = "pydicom contributors"},
+]
+
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: File Formats",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+dependencies = []
+description = "JPEG-LS for Python via CharLS C++ Library"
+keywords = ["python, jpeg"]
+license = {text = "MIT"}
+name = "pyjpegls"
+readme = "readme.md"
+requires-python = ">=3.7"
+version = "1.0.4"
+
+[project.urls]
+documentation = "https://pydicom.github.io/pydicom"
+download = "https://github.com/pydicom/pyjpegls/archive/master.zip"
+homepage = "https://github.com/pydicom/pyjpegls"
+repository = "https://github.com/pydicom/pyjpegls"
+
+[tool.setuptools.packages]
+find = {}
