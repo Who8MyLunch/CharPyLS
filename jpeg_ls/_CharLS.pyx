@@ -1,26 +1,27 @@
-
-# from __future__ import division, print_function, unicode_literals
+# cython: language_level=3
 
 import numpy as np
 cimport numpy as np
 
-JLS_ERROR_MESSAGES = {0: 'OK',
-                      1: 'Invalid Jls Parameters',
-                      2: 'Parameter Value Not Supported',
-                      3: 'Uncompressed Buffer Too Small',
-                      4: 'Compressed Buffer Too Small',
-                      5: 'Invalid Compressed Data',
-                      6: 'Too Much Compressed Data',
-                      7: 'Image Type Not Supported',
-                      8: 'Unsupported Bit Depth For Transform',
-                      9: 'Unsupported Color Transform'}
+JLS_ERROR_MESSAGES = {
+    0: "OK",
+    1: "Invalid Jls Parameters",
+    2: "Parameter Value Not Supported",
+    3: "Uncompressed Buffer Too Small",
+    4: "Compressed Buffer Too Small",
+    5: "Invalid Compressed Data",
+    6: "Too Much Compressed Data",
+    7: "Image Type Not Supported",
+    8: "Unsupported Bit Depth For Transform",
+    9: "Unsupported Color Transform",
+}
 
 
 
-cdef extern from 'define_charls_dll.h':
+cdef extern from "define_charls_dll.h":
     pass
 
-cdef extern from 'publictypes.h':
+cdef extern from "publictypes.h":
     cdef enum JLS_ERROR:
         pass
 
@@ -59,14 +60,29 @@ cdef extern from 'publictypes.h':
         JlsCustomParameters custom
         JfifParameters jfif
 
-cdef extern from 'interface.h':
-    cdef JLS_ERROR JpegLsEncode(char* compressedData, size_t compressedLength, size_t* byteCountWritten,
-                                char* uncompressedData, size_t uncompressedLength, JlsParameters* info)
+cdef extern from "interface.h":
+    cdef JLS_ERROR JpegLsEncode(
+        char* compressedData,
+        size_t compressedLength,
+        size_t* byteCountWritten,
+        char* uncompressedData,
+        size_t uncompressedLength,
+        JlsParameters* info
+    )
 
-    cdef JLS_ERROR JpegLsReadHeader(char* compressedData, size_t compressedLength, JlsParameters* info)
+    cdef JLS_ERROR JpegLsReadHeader(
+        char* compressedData,
+        size_t compressedLength,
+        JlsParameters* info
+    )
 
-    cdef JLS_ERROR JpegLsDecode(char* uncompressedData, size_t uncompressedLength,
-                                char* compressedData, size_t compressedLength, JlsParameters* info)
+    cdef JLS_ERROR JpegLsDecode(
+        char* uncompressedData,
+        size_t uncompressedLength,
+        char* compressedData,
+        size_t compressedLength,
+        JlsParameters* info
+    )
 
 
 ######################################
@@ -103,11 +119,8 @@ cdef JlsParameters build_parameters():
     return info
 
 
-
 def encode(data_image):
-    """
-    Encode grey-scale image via JPEG-LS using CharLS implementation.
-    """
+    """Encode grey-scale image via JPEG-LS using CharLS implementation."""
 
     data_image = np.asarray(data_image)
 
@@ -116,11 +129,11 @@ def encode(data_image):
     elif data_image.dtype == np.uint16:
         Bpp = 2
     else:
-        msg = 'Invalid input data type {}, expecting np.uint8 or np.uint16.'.format(data_image.dtype)
-        raise Exception(msg)
+        raise Exception(
+            f"Invalid input data type '{data_image.dtype}', expecting np.uint8 or np.uint16.")
 
     if len(data_image.shape) < 2 or len(data_image.shape) > 3:
-        raise Exception('Invalid data shape')
+        raise Exception("Invalid data shape")
 
     # Size of input image data.
     cdef int num_lines = data_image.shape[0]
@@ -132,15 +145,15 @@ def encode(data_image):
         num_bands = data_image.shape[2]
 
     if num_bands != 1:
-        raise Exception('Invalid number of bands {}'.format(num_bands))
+        raise Exception(f"Invalid number of bands {num_bands}")
 
 
     cdef int max_val = np.max(data_image)
     cdef int max_bits = 0
+    # Number of bits used by the image
     max_bits = int(np.ceil( np.log2(max_val + 1) ))
-
-    if max_bits <= 1:
-        max_bits = 2
+    # Minimum bit-depth is 2 (is it?)
+    max_bits = 2 if max_bits <= 1 else max_bits
 
     # Setup parameter structure.
     cdef JlsParameters info = build_parameters()
@@ -171,24 +184,23 @@ def encode(data_image):
     # Call encoder function.
     cdef size_t size_data = num_samples*num_lines*Bpp
     cdef JLS_ERROR err
-    err = JpegLsEncode(data_buffer_ptr, size_buffer, size_work_ptr,
-                       data_image_ptr, size_data, info_ptr)
+    err = JpegLsEncode(
+        data_buffer_ptr,
+        size_buffer,
+        size_work_ptr,
+        data_image_ptr,
+        size_data,
+        info_ptr,
+    )
 
     if err != 0:
-        raise Exception('Error calling CharLS: {}'.format(JLS_ERROR_MESSAGES[err]))
+        raise Exception(f"Error calling CharLS: {JLS_ERROR_MESSAGES[err]}")
 
-    # Finish.
-    data_buffer = data_buffer[:size_work]
-
-    # All done.
-    return data_buffer
-
+    return data_buffer[:size_work]
 
 
 cdef JlsParameters _read_header(np.ndarray[np.uint8_t, ndim=1] data_buffer):
-    """
-    Decode grey-scale image via JPEG-LS using CharLS implementation.
-    """
+    """Decode grey-scale image via JPEG-LS using CharLS implementation."""
 
     # Size of input image, point to buffer.
     cdef int size_buffer = data_buffer.shape[0]
@@ -209,32 +221,30 @@ cdef JlsParameters _read_header(np.ndarray[np.uint8_t, ndim=1] data_buffer):
     err = JpegLsReadHeader(data_buffer_ptr, size_buffer, info_ptr)
 
     if err != 0:
-        raise Exception('Error calling CharLS: {}'.format(JLS_ERROR_MESSAGES[err]))
+        raise Exception(f"Error calling CharLS: {JLS_ERROR_MESSAGES[err]}")
 
     # Done.
     return info #data_image
 
 
-
 def read_header(np.ndarray[np.uint8_t, ndim=1] data_buffer):
     info = _read_header(data_buffer)
 
-    header = {'width': info.width,
-              'height': info.height,
-              'bitspersample': info.bitspersample,
-              'bytesperline': info.bytesperline,
-              'components': info.components,
-              'allowedlossyerror': info.allowedlossyerror,
-              'ilv': info.ilv}
+    header = {
+        "width": info.width,
+        "height": info.height,
+        "bitspersample": info.bitspersample,
+        "bytesperline": info.bytesperline,
+        "components": info.components,
+        "allowedlossyerror": info.allowedlossyerror,
+        "ilv": info.ilv,
+    }
 
     return header
 
 
-
 def decode(np.ndarray[np.uint8_t, ndim=1] data_buffer):
-    """
-    Decode compressed data into image array.
-    """
+    """Decode compressed data into image array."""
 
     # Read header info.
     info = _read_header(data_buffer)
@@ -245,7 +255,7 @@ def decode(np.ndarray[np.uint8_t, ndim=1] data_buffer):
     elif 9 <= info.bitspersample <= 16:
         Bpp = 2
     else:
-        raise Exception('Invalid bitspersample: {}'.format(info.bitspersample))
+        raise Exception(f"Invalid bitspersample: {info.bitspersample}")
 
     cdef int size_buffer = data_buffer.shape[0]
 
@@ -259,11 +269,16 @@ def decode(np.ndarray[np.uint8_t, ndim=1] data_buffer):
 
     # Decode compressed data.
     cdef JLS_ERROR err
-    err = JpegLsDecode(data_image_ptr, size_data,
-                       data_buffer_ptr, size_buffer, info_ptr)
+    err = JpegLsDecode(
+        data_image_ptr,
+        size_data,
+        data_buffer_ptr,
+        size_buffer,
+        info_ptr,
+    )
 
     if err != 0:
-        raise Exception('Error calling CharLS: {}'.format(JLS_ERROR_MESSAGES[err]))
+        raise Exception(f"Error calling CharLS: {JLS_ERROR_MESSAGES[err]}")
 
     # Finish.
     num_samples = info.width
@@ -276,7 +291,4 @@ def decode(np.ndarray[np.uint8_t, ndim=1] data_buffer):
     else:
         data_image = data_image.reshape(num_lines, num_samples, num_bands)
 
-    data_image = data_image.squeeze()
-
-    # Done.
-    return data_image
+    return data_image.squeeze()

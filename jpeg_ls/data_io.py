@@ -1,17 +1,14 @@
-
 import PIL.Image
 import numpy as np
 
 
 def read(fp):
-    """Read image data from file-like object using PIL.  Return Numpy array.
-    """
-    with open(fp, 'rb') as fpp:
+    """Read image data from file-like object using PIL.  Return Numpy array."""
+    with open(fp, "rb") as fpp:
         img = PIL.Image.open(fpp)
         data = np.asarray(img)
 
     return data
-
 
 
 def write(fp, data, fmt=None, **kwargs):
