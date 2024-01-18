@@ -1,116 +1,130 @@
 # cython: language_level=3
 
+import logging
+import math
+from typing import Dict
+
 import numpy as np
-cimport numpy as np
+cimport numpy as cnp
 
-JLS_ERROR_MESSAGES = {
-    0: "OK",
-    1: "Invalid Jls Parameters",
-    2: "Parameter Value Not Supported",
-    3: "Uncompressed Buffer Too Small",
-    4: "Compressed Buffer Too Small",
-    5: "Invalid Compressed Data",
-    6: "Too Much Compressed Data",
-    7: "Image Type Not Supported",
-    8: "Unsupported Bit Depth For Transform",
-    9: "Unsupported Color Transform",
-}
 
+LOGGER = logging.getLogger("jpeg_ls._CharLS")
 
 
 cdef extern from "define_charls_dll.h":
     pass
 
-cdef extern from "publictypes.h":
-    cdef enum JLS_ERROR:
+cdef extern from "charls/public_types.h":
+    cdef enum JLS_ERROR "charls::jpegls_errc":
         pass
 
-    cdef enum interleavemode:
-        pass
-        # ILV_NONE = 0
-        # ILV_LINE = 1
-        # ILV_SAMPLE = 2
+    cdef enum interleave_mode "charls::interleave_mode":
+        CHARLS_INTERLEAVE_MODE_NONE = 0
+        CHARLS_INTERLEAVE_MODE_LINE = 1
+        CHARLS_INTERLEAVE_MODE_SAMPLE = 2
+
+    cdef enum color_transformation "charls::color_transformation":
+        CHARLS_COLOR_TRANSFORMATION_NONE = 0
+        CHARLS_COLOR_TRANSFORMATION_HP1 = 1
+        CHARLS_COLOR_TRANSFORMATION_HP2 = 2
+        CHARLS_COLOR_TRANSFORMATION_HP3 = 3
+
+    cdef struct JpegLSPresetCodingParameters:
+        long MaximumSampleValue
+        long Threshold1
+        long Threshold2
+        long Threshold3
+        long ResetValue
 
     cdef struct JfifParameters:
-        int Ver
-        char units
-        int XDensity
-        int YDensity
-        short Xthumb
-        short Ythumb
-        char* pdataThumbnail
-
-    cdef struct JlsCustomParameters:
-        int MAXVAL
-        int T1
-        int T2
-        int T3
-        int RESET
+        long version
+        long units
+        long Xdensity
+        long Ydensity
+        long Xthumbnail
+        long Ythumbnail
+        void* thumbnail
 
     cdef struct JlsParameters:
-        int width
-        int height
-        int bitspersample
-        int bytesperline
-        int components
-        int allowedlossyerror
-        interleavemode ilv
-        int colorTransform
+        # Width in pixels (number of samples per line)
+        long width
+        # Height in pixels (number of lines)
+        long height
+        # Bits per sample (sample precision (2, 16))
+        long bitsPerSample
+        # Number of bytes from one row of pixels to the next
+        long stride
+        # Number of components, 1 for monochrome, 3 for RGB (1, 255)
+        long components
+        # The allowed lossy error, 0 for lossless
+        long allowedLossyError
+        # The order of color components in the compressed stream
+        interleave_mode interleaveMode
+        color_transformation colorTransformation
         char outputBgr
-        JlsCustomParameters custom
+        JpegLSPresetCodingParameters custom
         JfifParameters jfif
 
-cdef extern from "interface.h":
-    cdef JLS_ERROR JpegLsEncode(
-        char* compressedData,
-        size_t compressedLength,
-        size_t* byteCountWritten,
-        char* uncompressedData,
-        size_t uncompressedLength,
-        JlsParameters* info
-    )
-
+cdef extern from "charls/charls_jpegls_decoder.h":
     cdef JLS_ERROR JpegLsReadHeader(
-        char* compressedData,
-        size_t compressedLength,
-        JlsParameters* info
+        void* source,
+        size_t source_length,
+        JlsParameters* params,
+        char* error_message
     )
 
     cdef JLS_ERROR JpegLsDecode(
-        char* uncompressedData,
-        size_t uncompressedLength,
-        char* compressedData,
-        size_t compressedLength,
-        JlsParameters* info
+        void* dst,
+        size_t dst_length,
+        void * src,
+        size_t src_length,
+        JlsParameters* info,
+        char* error_message
     )
 
-
-######################################
+cdef extern from "charls/charls_jpegls_encoder.h":
+    cdef JLS_ERROR JpegLsEncode(
+        void* dst,
+        size_t dst_length,
+        size_t* bytes_written,
+        void* src,
+        size_t src_length,
+        JlsParameters* info,
+        char* error_message
+    )
 
 
 cdef JlsParameters build_parameters():
 
-    cdef JlsCustomParameters info_custom
-    info_custom.MAXVAL = 0
-    info_custom.T1 = 0
-    info_custom.T2 = 0
-    info_custom.T3 = 0
-    info_custom.RESET = 0
+    cdef JpegLSPresetCodingParameters info_custom
+    info_custom.MaximumSampleValue = 0
+    info_custom.Threshold1 = 0
+    info_custom.Threshold2 = 0
+    info_custom.Threshold3 = 0
+    info_custom.ResetValue = 0
 
     cdef JfifParameters jfif
-    jfif.Xthumb = 0
-    jfif.Ythumb = 0
+    jfif.version = 0
+    jfif.units = 0
+    jfif.Xdensity = 0
+    jfif.Ydensity = 0
+    jfif.Xthumbnail = 0
+    jfif.Ythumbnail = 0
 
     cdef JlsParameters info
 
     info.width = 0
     info.height = 0
-    info.bitspersample = 0
-    info.bytesperline = 0
-    info.components = 1    # number of components (RGB = 3, RGBA = 4, monochrome = 1;
-    info.allowedlossyerror = 0   #  0 means lossless
-    info.ilv = <interleavemode>0   # For monochrome images, always use ILV_NONE.
-    info.colorTransform = 0   # 0 means no color transform
+    info.bitsPerSample = 0
+    info.stride = 0
+    # number of components (RGB = 3, RGBA = 4, monochrome = 1;
+    info.components = 1
+    #  0 means lossless
+    info.allowedLossyError = 0
+    # For monochrome images, always use ILV_NONE.
+    info.interleaveMode = <interleave_mode> 0
+    # 0 means no color transform
+    info.colorTransformation = <color_transformation> 0
     info.outputBgr = 0  # when set to true, CharLS will reverse the normal RGB
     info.custom = info_custom
     info.jfif = jfif
@@ -119,176 +133,243 @@ cdef JlsParameters build_parameters():
     return info
 
 
-def encode(data_image):
-    """Encode grey-scale image via JPEG-LS using CharLS implementation."""
+cdef JlsParameters _read_header(bytes buffer):
+    """Decode grey-scale image via JPEG-LS using CharLS implementation.
 
-    data_image = np.asarray(data_image)
-
-    if data_image.dtype == np.uint8:
-        Bpp = 1
-    elif data_image.dtype == np.uint16:
-        Bpp = 2
-    else:
-        raise Exception(
-            f"Invalid input data type '{data_image.dtype}', expecting np.uint8 or np.uint16.")
-
-    if len(data_image.shape) < 2 or len(data_image.shape) > 3:
-        raise Exception("Invalid data shape")
-
-    # Size of input image data.
-    cdef int num_lines = data_image.shape[0]
-    cdef int num_samples = data_image.shape[1]
-    cdef int num_bands
-    if len(data_image.shape) == 2:
-        num_bands = 1
-    else:
-        num_bands = data_image.shape[2]
-
-    if num_bands != 1:
-        raise Exception(f"Invalid number of bands {num_bands}")
-
-
-    cdef int max_val = np.max(data_image)
-    cdef int max_bits = 0
-    # Number of bits used by the image
-    max_bits = int(np.ceil( np.log2(max_val + 1) ))
-    # Minimum bit-depth is 2 (is it?)
-    max_bits = 2 if max_bits <= 1 else max_bits
-
-    # Setup parameter structure.
-    cdef JlsParameters info = build_parameters()
-
-    info.width = num_samples
-    info.height = num_lines
-    info.components = num_bands
-    info.ilv = <interleavemode>0
-
-    info.bytesperline = num_samples * Bpp
-    info.bitspersample = max_bits
-
-    info.allowedlossyerror = 0
-
-    # Buffer to store compressed data results.
-    cdef size_t size_buffer = num_samples*num_lines*Bpp*2
-
-    data_buffer = np.zeros(size_buffer, dtype=np.uint8)
-    cdef char* data_buffer_ptr = <char*>np.PyArray_DATA(data_buffer)
-
-    cdef size_t size_work
-
-    # Pointers to input and output data.
-    cdef char* data_image_ptr = <char*>np.PyArray_DATA(data_image)
-    cdef JlsParameters* info_ptr = &info
-    cdef size_t* size_work_ptr = &size_work
-
-    # Call encoder function.
-    cdef size_t size_data = num_samples*num_lines*Bpp
-    cdef JLS_ERROR err
-    err = JpegLsEncode(
-        data_buffer_ptr,
-        size_buffer,
-        size_work_ptr,
-        data_image_ptr,
-        size_data,
-        info_ptr,
-    )
-
-    if err != 0:
-        raise Exception(f"Error calling CharLS: {JLS_ERROR_MESSAGES[err]}")
-
-    return data_buffer[:size_work]
-
-
-cdef JlsParameters _read_header(np.ndarray[np.uint8_t, ndim=1] data_buffer):
-    """Decode grey-scale image via JPEG-LS using CharLS implementation."""
-
+    Returns
+    -------
+    JlsParameters
+        The JPEG-LS stream header information.
+    """
     # Size of input image, point to buffer.
-    cdef int size_buffer = data_buffer.shape[0]
-
-    #
-    # Read compressed data header.
-    #
+    cdef int size_buffer = len(buffer)
 
     # Setup parameter structure.
     cdef JlsParameters info = build_parameters()
 
     # Pointers to input and output data.
-    cdef char* data_buffer_ptr = <char*>np.PyArray_DATA(data_buffer)
+    cdef char* data_buffer_ptr = <char*>buffer
     cdef JlsParameters* info_ptr = &info
+
+    # Error strings are defined in jpegls_error.cpp
+    # As of v2.4.2 the longest string is ~114 chars, so give it a 256 buffer
+    err_msg = bytearray(b"\x00" * 256)
+    cdef char *error_message = <char*>err_msg
 
     # Read the header.
     cdef JLS_ERROR err
-    err = JpegLsReadHeader(data_buffer_ptr, size_buffer, info_ptr)
+    err = JpegLsReadHeader(
+        data_buffer_ptr,
+        size_buffer,
+        info_ptr,
+        error_message
+    )
 
-    if err != 0:
-        raise Exception(f"Error calling CharLS: {JLS_ERROR_MESSAGES[err]}")
+    if <int> err != 0:
+        error = err_msg.decode("ascii").strip("\0")
+        raise RuntimeError(f"Decoding error: {error}")
 
-    # Done.
-    return info #data_image
+    return info
 
 
-def read_header(np.ndarray[np.uint8_t, ndim=1] data_buffer):
-    info = _read_header(data_buffer)
-
-    header = {
+def read_header(src: bytes | bytearray) -> Dict[str, int]:
+    """Return a dict containing information about the JPEG-LS file."""
+    # info: JlsParameters
+    info = _read_header(bytes(src))
+    return {
         "width": info.width,
         "height": info.height,
-        "bitspersample": info.bitspersample,
-        "bytesperline": info.bytesperline,
+        "bits_per_sample": info.bitsPerSample,
+        "stride": info.stride,
         "components": info.components,
-        "allowedlossyerror": info.allowedlossyerror,
-        "ilv": info.ilv,
+        "allowed_lossy_error": info.allowedLossyError,
+        "interleave_mode": info.interleaveMode,
+        "colour_transformation": info.colorTransformation,
     }
 
-    return header
 
+def _decode(src: bytes | bytearray) -> bytearray:
+    """Decode the JPEG-LS codestream `src` to a bytearray
 
-def decode(np.ndarray[np.uint8_t, ndim=1] data_buffer):
-    """Decode compressed data into image array."""
+    Parameters
+    ----------
+    src : bytes | bytearray
+        The JPEG-LS codestream to be decoded.
 
-    # Read header info.
-    info = _read_header(data_buffer)
+    Returns
+    -------
+    bytearray
+        The decoded image data.
+    """
+    if isinstance(src, bytearray):
+        src = bytes(src)
 
-    # Sizes of data.
-    if 2 <= info.bitspersample <= 8:
-        Bpp = 1
-    elif 9 <= info.bitspersample <= 16:
-        Bpp = 2
-    else:
-        raise Exception(f"Invalid bitspersample: {info.bitspersample}")
+    info = _read_header(src)
 
-    cdef int size_buffer = data_buffer.shape[0]
+    bytes_per_pixel = math.ceil(info.bitsPerSample / 8)
+    dst_length = info.width * info.height * info.components * bytes_per_pixel
+    dst = bytearray(b"\x00" * dst_length)
 
-    cdef size_data = info.width * info.height * info.components * Bpp
-    data_image = np.zeros(size_data, dtype=np.uint8)
-
-    # Pointers to input and output data.
-    cdef char* data_buffer_ptr = <char*>np.PyArray_DATA(data_buffer)
-    cdef JlsParameters* info_ptr = &info
-    cdef char* data_image_ptr = <char*>np.PyArray_DATA(data_image)
+    # Error strings are defined in jpegls_error.cpp
+    # As of v2.4.2 the longest string is ~114 chars, so give it a 256 buffer
+    error_message = bytearray(b"\x00" * 256)
 
     # Decode compressed data.
     cdef JLS_ERROR err
     err = JpegLsDecode(
-        data_image_ptr,
-        size_data,
-        data_buffer_ptr,
-        size_buffer,
-        info_ptr,
+        <char *>dst,
+        dst_length,
+        <char *>src,
+        len(src),
+        &info,
+        <char *>error_message
     )
 
-    if err != 0:
-        raise Exception(f"Error calling CharLS: {JLS_ERROR_MESSAGES[err]}")
+    if <int> err != 0:
+        msg = error_message.decode("ascii").strip("\0")
+        raise RuntimeError(f"Decoding error: {msg}")
 
-    # Finish.
-    num_samples = info.width
-    num_lines = info.height
-    num_bands = info.components
+    return dst
 
-    if Bpp == 2:
-        data_image = data_image.view(dtype=np.uint16)
-        data_image = data_image.reshape(num_lines, num_samples, num_bands)
+
+def decode_from_buffer(src: bytes | bytearray) -> bytearray:
+    """Decode the JPEG-LS codestream `src` to a bytearray
+
+    Parameters
+    ----------
+    src : bytes | bytearray
+        The JPEG-LS codestream to be decoded.
+
+    Returns
+    -------
+    bytearray
+        The decoded image data.
+    """
+    return _decode(src)
+
+
+def decode(cnp.ndarray[cnp.uint8_t, ndim=1] data_buffer):
+    """Decode the JPEG-LS codestream in the ndarray `data_buffer`
+
+    Parameters
+    ----------
+    data_buffer : numpy.ndarray
+        The JPEG-LS codestream to be decoded as 1 dimensional ndarray of uint8.
+
+    Returns
+    -------
+    numpy.ndarray
+        The decoded image.
+    """
+    src = data_buffer.tobytes()
+
+    info = read_header(src)
+    bytes_per_pixel = math.ceil(info["bits_per_sample"] / 8)
+    arr = np.frombuffer(_decode(src), dtype=f"u{bytes_per_pixel}")
+
+    if info["components"] == 3:
+        return arr.reshape((info["height"], info["width"], 3))
+
+    return arr.reshape((info["height"], info["width"]))
+
+
+def encode_to_buffer(arr: np.ndarray, lossy_error: int = 0, interleave: int = 0) -> bytearray:
+    """Return the image data in `arr` as a JPEG-LS encoded bytearray.
+
+    Parameters
+    ----------
+    arr : numpy.ndarray
+        An ndarray containing the image data.
+    lossy_error : int, optional
+        The absolute value of the allowable error when encoding using
+        near-lossless, default ``0`` (lossless). For example, if using 8-bit
+        pixel data then the allowable error for a lossy image may be in the
+        range (1, 255).
+    interleave : int, optional
+        The interleaving mode for multi-component images, default ``0``. One of
+
+        * ``0``: pixels are ordered R1R2...RnG1G2...GnB1B2...Bn
+        * ``1``: pixels are ordered R1...RwG1...GwB1...BwRw+1... where w is the
+          width of the image (i.e. the data is ordered line by line)
+        * ``2``: pixels are ordered R1G1B1R2G2B2...RnGnBn
+
+    Returns
+    -------
+    bytearray
+        The encoded JPEG-LS codestream.
+    """
+    if arr.dtype == np.uint8:
+        bytes_per_pixel = 1
+    elif arr.dtype == np.uint16:
+        bytes_per_pixel = 2
     else:
-        data_image = data_image.reshape(num_lines, num_samples, num_bands)
+        raise ValueError(
+            f"Invalid input data type '{arr.dtype}', expecting np.uint8 or np.uint16."
+        )
 
-    return data_image.squeeze()
+    src_length = arr.size * bytes_per_pixel
+    nr_dims = len(arr.shape)
+    if nr_dims not in (2, 3):
+        raise ValueError("Invalid data shape")
+
+    LOGGER.debug(
+        f"Encoding 'src' is {src_length} bytes, shaped as {arr.shape} with "
+        f"{bytes_per_pixel} bytes per pixel"
+    )
+
+    if interleave not in (0, 1, 2):
+        raise ValueError("Invalid 'interleave' value, must be 0, 1 or 2")
+
+    cdef JlsParameters info = build_parameters()
+    info.height = arr.shape[0]
+    info.width = arr.shape[1]
+    info.components = arr.shape[2] if nr_dims == 3 else 1
+    info.interleaveMode = <interleave_mode><int>interleave
+    info.allowedLossyError = lossy_error
+    info.stride = info.width * bytes_per_pixel
+
+    bit_depth = math.ceil(math.log(arr.max() + 1, 2))
+    info.bitsPerSample = 2 if bit_depth <= 1 else bit_depth
+
+    LOGGER.debug(
+        "Encoding paramers are:\n"
+        f"\tWidth: {info.width} px\n"
+        f"\tHeight: {info.height} px\n"
+        f"\tComponents: {info.components}\n"
+        f"\tBits per sample: {info.bitsPerSample}\n"
+        f"\tStride: {info.stride} bytes\n"
+        f"\tInterleave mode: {<int>info.interleaveMode}\n"
+        f"\tAllowed lossy error: {info.allowedLossyError}\n"
+    )
+
+    # Destination for the compressed data - start out twice the length of raw
+    dst = bytearray(b"\x00" * src_length * 2)
+
+    # Number of bytes of compressed data
+    cdef size_t compressed_length = 0
+
+    # Error strings are defined in jpegls_error.cpp
+    # As of v2.4.2 the longest string is ~114 chars, so give it a 256 buffer
+    error_message = bytearray(b"\x00" * 256)
+
+    cdef JLS_ERROR err
+    err = JpegLsEncode(
+        <char *>dst,
+        len(dst),
+        &compressed_length,
+        <char *>cnp.PyArray_DATA(arr),
+        src_length,
+        &info,
+        <char *>error_message
+    )
+
+    if <int> err != 0:
+        msg = error_message.decode("ascii").strip("\0")
+        raise RuntimeError(f"Encoding error: {msg}")
+
+    return dst[:compressed_length]
+
+
+def encode(arr: np.ndarray) -> np.ndarray:
+    """Return the image data in `arr` as a JPEG-LS encoded 1D ndarray."""
+    return np.frombuffer(encode_to_buffer(arr), dtype="u1")

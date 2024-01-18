@@ -1,4 +1,3 @@
-
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
@@ -6,6 +5,7 @@ import pytest
 import numpy as np
 
 from jpeg_ls import decode, encode, write, read
+from _CharLS import encode_to_buffer, decode_from_buffer
 
 
 DATA = Path(__file__).parent / "jlsimV100"
@@ -76,32 +76,37 @@ def TEST16():
 
 class TestEncode:
     """Tests for encode()"""
+
     def test_invalid_dtype_raises(self):
         msg = "Invalid input data type 'float64', expecting np.uint8 or np.uint16"
         with pytest.raises(Exception, match=msg):
             encode(np.empty((2, 2), dtype=float))
 
     def test_invalid_nr_components_raises(self):
-        msg = "Invalid number of bands 3"
+        msg = (
+            "Encoding error: The component count argument is outside the range"
+            "[1, 255]"
+        )
         with pytest.raises(Exception, match=msg):
-            encode(np.empty((2, 2, 3), dtype="u1"))
+            encode(np.empty((2, 2, 256), dtype="u1"))
 
     def test_invalid_shape_raises(self):
         msg = "Invalid data shape"
         with pytest.raises(Exception, match=msg):
-            encode(np.empty((2, ), dtype="u1"))
+            encode(np.empty((2,), dtype="u1"))
 
         with pytest.raises(Exception, match=msg):
             encode(np.empty((2, 2, 2, 2), dtype="u1"))
 
     def test_TEST8(self, TEST8):
-        msg = "Invalid number of bands 3"
-        with pytest.raises(Exception, match=msg):
-            encode(TEST8)
+        buffer = encode(TEST8)
+        assert isinstance(buffer, np.ndarray)  # weird choice
+        arr = decode(buffer)
+        assert np.array_equal(arr, TEST8)
 
     def test_TEST8R(self, TEST8R):
         buffer = encode(TEST8R)
-        assert isinstance(buffer, np.ndarray)  # weird
+        assert isinstance(buffer, np.ndarray)
         assert buffer.shape[0] < TEST8R.shape[0] * TEST8R.shape[1]
         arr = decode(buffer)
         assert np.array_equal(arr, TEST8R)
@@ -135,6 +140,32 @@ class TestEncode:
         assert isinstance(buffer, np.ndarray)
         arr = decode(buffer)
         assert np.array_equal(arr, TEST16)
+
+
+class TestEncodeBytes:
+    def test_invalid_lossy_raises(self, TEST8):
+        msg = (
+            "Encoding error: The near lossless argument is outside the range" "[0, 255]"
+        )
+        with pytest.raises(RuntimeError, match=msg):
+            encode_to_buffer(TEST8, lossy_error=-1)
+
+        with pytest.raises(RuntimeError, match=msg):
+            encode_to_buffer(TEST8, lossy_error=256)
+
+    def test_TEST8_lossy(self, TEST8):
+        buffer = encode_to_buffer(TEST8, lossy_error=5)
+        assert isinstance(buffer, bytearray)
+        arr = np.frombuffer(decode_from_buffer(buffer), dtype="u1")
+        arr = arr.reshape(TEST8.shape)
+        assert np.allclose(arr, TEST8, atol=5)
+
+    def test_TEST8R_lossy(self, TEST8R):
+        buffer = encode_to_buffer(TEST8R, lossy_error=3)
+        assert isinstance(buffer, bytearray)
+        arr = np.frombuffer(decode_from_buffer(buffer), dtype="u1")
+        arr = arr.reshape(TEST8R.shape)
+        assert np.allclose(arr, TEST8R, atol=3)
 
 
 def test_write(TEST8R):
