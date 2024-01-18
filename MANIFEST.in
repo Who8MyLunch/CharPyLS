@@ -1,0 +1,7 @@
+include lib/charls/src/*
+include lib/charls/include/charls/*
+include lib/charls/README.md
+include jpeg_ls/tests/jlsimV100/*
+include jpeg_ls/*.cpp
+include jpeg_ls/*.h
+include jpeg_ls/*.pyx
