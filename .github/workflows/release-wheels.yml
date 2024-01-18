@@ -215,7 +215,7 @@ jobs:
   # See: https://github.com/pypa/gh-action-pypi-publish/discussions/15
   deploy:
     name: Upload wheels to PyPI
-    needs: [ build-wheels ]
+    needs: [ test-package ]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
