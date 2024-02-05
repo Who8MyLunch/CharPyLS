@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 import numpy as np
+import matplotlib.pyplot as plt
 
 from jpeg_ls import decode, encode, write, read
 from _CharLS import encode_to_buffer, decode_from_buffer
@@ -88,7 +89,7 @@ class TestEncode:
             "[1, 255]"
         )
         with pytest.raises(Exception, match=msg):
-            encode(np.empty((2, 2, 256), dtype="u1"))
+            encode(np.empty((3, 2, 256), dtype="u1"), interleave_mode=1)
 
     def test_invalid_shape_raises(self):
         msg = "Invalid data shape"
@@ -98,13 +99,40 @@ class TestEncode:
         with pytest.raises(Exception, match=msg):
             encode(np.empty((2, 2, 2, 2), dtype="u1"))
 
-    def test_TEST8(self, TEST8):
-        buffer = encode(TEST8)
-        assert isinstance(buffer, np.ndarray)  # weird choice
+    def test_TEST8_ILV0(self, TEST8):
+        # 3 component, ILV 0
+        # Convert from colour-by-pixel to colour-by-plane
+        arr = TEST8.transpose(2, 0, 1)
+        assert arr.shape == (3, 256, 256)
+        buffer = encode(arr, interleave_mode=0)
+        with open("ilv0.jls", "wb") as f:
+            f.write(buffer)
+        assert isinstance(buffer, np.ndarray)
+        arr = decode(buffer)
+        assert np.array_equal(arr, TEST8)
+
+    def test_TEST8_ILV1(self, TEST8):
+        # 3 component, ILV 1
+        assert TEST8.shape == (256, 256, 3)
+        buffer = encode(TEST8, interleave_mode=1)
+        with open("ilv1.jls", "wb") as f:
+            f.write(buffer)
+        assert isinstance(buffer, np.ndarray)
+        arr = decode(buffer)
+        assert np.array_equal(arr, TEST8)
+
+    def test_TEST8_ILV2(self, TEST8):
+        # 3 component, ILV 2
+        assert TEST8.shape == (256, 256, 3)
+        buffer = encode(TEST8, interleave_mode=2)
+        with open("ilv2.jls", "wb") as f:
+            f.write(buffer)
+        assert isinstance(buffer, np.ndarray)
         arr = decode(buffer)
         assert np.array_equal(arr, TEST8)
 
     def test_TEST8R(self, TEST8R):
+        # 1 component, ILV 0
         buffer = encode(TEST8R)
         assert isinstance(buffer, np.ndarray)
         assert buffer.shape[0] < TEST8R.shape[0] * TEST8R.shape[1]
@@ -145,7 +173,7 @@ class TestEncode:
 class TestEncodeBytes:
     def test_invalid_lossy_raises(self, TEST8):
         msg = (
-            "Encoding error: The near lossless argument is outside the range" "[0, 255]"
+            r"Encoding error: The near lossless argument is outside the range \[0, 255\]"
         )
         with pytest.raises(RuntimeError, match=msg):
             encode_to_buffer(TEST8, lossy_error=-1)
@@ -156,14 +184,16 @@ class TestEncodeBytes:
     def test_TEST8_lossy(self, TEST8):
         buffer = encode_to_buffer(TEST8, lossy_error=5)
         assert isinstance(buffer, bytearray)
-        arr = np.frombuffer(decode_from_buffer(buffer), dtype="u1")
+        data, info = decode_from_buffer(buffer)
+        arr = np.frombuffer(data, dtype="u1")
         arr = arr.reshape(TEST8.shape)
         assert np.allclose(arr, TEST8, atol=5)
 
     def test_TEST8R_lossy(self, TEST8R):
         buffer = encode_to_buffer(TEST8R, lossy_error=3)
         assert isinstance(buffer, bytearray)
-        arr = np.frombuffer(decode_from_buffer(buffer), dtype="u1")
+        data, info = decode_from_buffer(buffer)
+        arr = np.frombuffer(data, dtype="u1")
         arr = arr.reshape(TEST8R.shape)
         assert np.allclose(arr, TEST8R, atol=3)
 

@@ -14,11 +14,12 @@ LOGGER = logging.getLogger("jpeg_ls._CharLS")
 cdef extern from "define_charls_dll.h":
     pass
 
+
 cdef extern from "charls/public_types.h":
     cdef enum JLS_ERROR "charls::jpegls_errc":
         pass
 
-    cdef enum interleave_mode "charls::interleave_mode":
+    cdef enum c_interleave_mode "charls::interleave_mode":
         CHARLS_INTERLEAVE_MODE_NONE = 0
         CHARLS_INTERLEAVE_MODE_LINE = 1
         CHARLS_INTERLEAVE_MODE_SAMPLE = 2
@@ -52,18 +53,19 @@ cdef extern from "charls/public_types.h":
         long height
         # Bits per sample (sample precision (2, 16))
         long bitsPerSample
-        # Number of bytes from one row of pixels to the next
+        # Number of bytes from one row of pixels to the next in memory
         long stride
         # Number of components, 1 for monochrome, 3 for RGB (1, 255)
         long components
         # The allowed lossy error, 0 for lossless
         long allowedLossyError
         # The order of color components in the compressed stream
-        interleave_mode interleaveMode
+        c_interleave_mode interleaveMode
         color_transformation colorTransformation
         char outputBgr
         JpegLSPresetCodingParameters custom
         JfifParameters jfif
+
 
 cdef extern from "charls/charls_jpegls_decoder.h":
     cdef JLS_ERROR JpegLsReadHeader(
@@ -81,6 +83,7 @@ cdef extern from "charls/charls_jpegls_decoder.h":
         JlsParameters* info,
         char* error_message
     )
+
 
 cdef extern from "charls/charls_jpegls_encoder.h":
     cdef JLS_ERROR JpegLsEncode(
@@ -122,14 +125,13 @@ cdef JlsParameters build_parameters():
     #  0 means lossless
     info.allowedLossyError = 0
     # For monochrome images, always use ILV_NONE.
-    info.interleaveMode = <interleave_mode> 0
+    info.interleaveMode = <c_interleave_mode> 0
     # 0 means no color transform
     info.colorTransformation = <color_transformation> 0
     info.outputBgr = 0  # when set to true, CharLS will reverse the normal RGB
     info.custom = info_custom
     info.jfif = jfif
 
-    # Done.
     return info
 
 
@@ -232,7 +234,7 @@ def _decode(src: bytes | bytearray) -> bytearray:
     return dst
 
 
-def decode_from_buffer(src: bytes | bytearray) -> bytearray:
+def decode_from_buffer(src: bytes | bytearray) -> tuple[bytearray, dict[str, int]]:
     """Decode the JPEG-LS codestream `src` to a bytearray
 
     Parameters
@@ -242,10 +244,10 @@ def decode_from_buffer(src: bytes | bytearray) -> bytearray:
 
     Returns
     -------
-    bytearray
-        The decoded image data.
+    tuple[bytearray, dict[str, int]]
+        The decoded (image data, image metadata).
     """
-    return _decode(src)
+    return _decode(src), read_header(src)
 
 
 def decode(cnp.ndarray[cnp.uint8_t, ndim=1] data_buffer):
@@ -266,14 +268,28 @@ def decode(cnp.ndarray[cnp.uint8_t, ndim=1] data_buffer):
     info = read_header(src)
     bytes_per_pixel = math.ceil(info["bits_per_sample"] / 8)
     arr = np.frombuffer(_decode(src), dtype=f"u{bytes_per_pixel}")
+    rows = info["height"]
+    columns = info["width"]
+    samples_per_pixel = info["components"]
 
     if info["components"] == 3:
-        return arr.reshape((info["height"], info["width"], 3))
+        if info["interleave_mode"] == 0:
+            # ILV 0 is colour-by-plane, needs to be reshaped then transposed
+            #   to colour-by-pixel instead
+            arr = arr.reshape((samples_per_pixel, rows, columns))
+            return arr.transpose(1, 2, 0)
 
-    return arr.reshape((info["height"], info["width"]))
+        # Colour-by-pixel, just needs to be reshaped
+        return arr.reshape((rows, columns, samples_per_pixel))
+
+    return arr.reshape((rows, columns))
 
 
-def encode_to_buffer(arr: np.ndarray, lossy_error: int = 0, interleave: int = 0) -> bytearray:
+def encode_to_buffer(
+    src: np.ndarray | bytes,
+    lossy_error: int = 0,
+    interleave_mode: int | None = None,
+) -> bytearray:
     """Return the image data in `arr` as a JPEG-LS encoded bytearray.
 
     Parameters
@@ -285,13 +301,18 @@ def encode_to_buffer(arr: np.ndarray, lossy_error: int = 0, interleave: int = 0)
         near-lossless, default ``0`` (lossless). For example, if using 8-bit
         pixel data then the allowable error for a lossy image may be in the
         range (1, 255).
-    interleave : int, optional
-        The interleaving mode for multi-component images, default ``0``. One of
+    interleave_mode : int, optional
+        The interleaving mode for multi-component (i.e. non-greyscale) images,
+        default ``0``. One of
 
-        * ``0``: pixels are ordered R1R2...RnG1G2...GnB1B2...Bn
-        * ``1``: pixels are ordered R1...RwG1...GwB1...BwRw+1... where w is the
-          width of the image (i.e. the data is ordered line by line)
-        * ``2``: pixels are ordered R1G1B1R2G2B2...RnGnBn
+        * ``0``: the pixels in `src` are ordered R1R2...RnG1G2...GnB1B2...Bn
+        * ``1``: the pixels in `src` are ordered R1...RwG1...GwB1...BwRw+1...
+          where w is the width of the image (i.e. the data is ordered line by line)
+        * ``2``: the pixels in `src` are ordered R1G1B1R2G2B2...RnGnBn
+
+        It's recommended that the pixel data in `src` be ordered to match an
+        interleaving mode of ``0`` as this should result in the greatest
+        compression ratio.
 
     Returns
     -------
@@ -317,16 +338,45 @@ def encode_to_buffer(arr: np.ndarray, lossy_error: int = 0, interleave: int = 0)
         f"{bytes_per_pixel} bytes per pixel"
     )
 
-    if interleave not in (0, 1, 2):
-        raise ValueError("Invalid 'interleave' value, must be 0, 1 or 2")
+    if nr_dims == 2:
+        # Greyscale images should always be interleave mode 0
+        interleave_mode = 0
+        rows = arr.shape[0]
+        columns = arr.shape[1]
+    else:
+        # Multi-component images may be interleave mode 0, 1 or 2
+        if arr.shape[-1] in (3, 4):
+            # Colour-by-pixel (R, C, 3) or (R, C, 4)
+            # Mode 1 and 2 are identical apparently
+            interleave_mode = 2 if interleave_mode is None else interleave_mode
+        elif arr.shape[0] in (3, 4):
+            # Colour-by-plane (3, R, C) or (4, R, C)
+            interleave_mode = 0 if interleave_mode is None else interleave_mode
+        elif interleave_mode is None:
+            raise ValueError(
+                "Unable to automatically determine an appropriate 'interleave_mode' "
+                "value, please set it manually"
+            )
+
+        if interleave_mode == 0:
+            components = arr.shape[0]
+            rows = arr.shape[1]
+            columns = arr.shape[2]
+        else:
+            rows = arr.shape[0]
+            columns = arr.shape[1]
+            components = arr.shape[2]
 
     cdef JlsParameters info = build_parameters()
-    info.height = arr.shape[0]
-    info.width = arr.shape[1]
-    info.components = arr.shape[2] if nr_dims == 3 else 1
-    info.interleaveMode = <interleave_mode><int>interleave
+    info.height = rows
+    info.width = columns
+    info.components = components if nr_dims == 3 else 1
+    info.interleaveMode = <c_interleave_mode><int>interleave_mode
     info.allowedLossyError = lossy_error
+
     info.stride = info.width * bytes_per_pixel
+    if interleave_mode != 0:
+        info.stride = info.stride * info.components
 
     bit_depth = math.ceil(math.log(arr.max() + 1, 2))
     info.bitsPerSample = 2 if bit_depth <= 1 else bit_depth
@@ -352,12 +402,16 @@ def encode_to_buffer(arr: np.ndarray, lossy_error: int = 0, interleave: int = 0)
     # As of v2.4.2 the longest string is ~114 chars, so give it a 256 buffer
     error_message = bytearray(b"\x00" * 256)
 
+    # We need a contiguous buffer in the correct interleave mode (i.e. not
+    #   just a re-view via ndarray.transpose())
+    src = arr.tobytes()
+
     cdef JLS_ERROR err
     err = JpegLsEncode(
         <char *>dst,
         len(dst),
         &compressed_length,
-        <char *>cnp.PyArray_DATA(arr),
+        <char *>src,
         src_length,
         &info,
         <char *>error_message
@@ -370,6 +424,13 @@ def encode_to_buffer(arr: np.ndarray, lossy_error: int = 0, interleave: int = 0)
     return dst[:compressed_length]
 
 
-def encode(arr: np.ndarray) -> np.ndarray:
+def encode(
+    arr: np.ndarray,
+    lossy_error: int = 0,
+    interleave_mode: int | None = None,
+) -> np.ndarray:
     """Return the image data in `arr` as a JPEG-LS encoded 1D ndarray."""
-    return np.frombuffer(encode_to_buffer(arr), dtype="u1")
+    return np.frombuffer(
+        encode_to_buffer(arr, lossy_error, interleave_mode),
+        dtype="u1",
+    )

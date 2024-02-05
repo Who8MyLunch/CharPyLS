@@ -75,20 +75,18 @@ def TEST16():
 class TestRead:
     """Tests for read()"""
 
-    @pytest.mark.xfail
-    def test_T8C0E0(self):
-        # Decodes, but the output is weird
+    def test_T8C0E0(self, TEST8):
         # TEST8 in colour mode 0, lossless
+        # 3 component, 3 scans, ILV 0, lossless
         arr = read(DATA / "T8C0E0.JLS")
-        assert arr.shape == (256, 256)
+        assert arr.shape == (256, 256, 3)
         assert np.array_equal(arr, TEST8)
 
-    @pytest.mark.xfail
-    def test_T8C0E3(self):
-        # Decodes, but the output is weird
+    def test_T8C0E3(self, TEST8):
         # TEST8 in colour mode 0, lossy
+        # 3 component, 3 scans, ILV 0, lossy
         arr = read(DATA / "T8C0E0.JLS")
-        assert arr.shape == (256, 256)
+        assert arr.shape == (256, 256, 3)
         assert np.allclose(arr, TEST8, atol=3)
 
     def test_T8C1E0(self, TEST8):
@@ -125,6 +123,7 @@ class TestRead:
     def test_T8SSE0(self, TEST8):
         # The JPEG-LS stream is encoded with a parameter value that is not
         #   supported by the CharLS decoder
+        # Uses non-default T1, T2, T3 and RESET values (T1=T2=T3=9, RESET=31)
         # TEST8 lossless
         arr = read(DATA / "T8SSE0.JLS")
         assert np.array_equal(arr, TEST8)
@@ -133,6 +132,7 @@ class TestRead:
     def test_T8SSE3(self, TEST8):
         # The JPEG-LS stream is encoded with a parameter value that is not
         #   supported by the CharLS decoder
+        # Uses non-default T1, T2, T3 and RESET values (T1=T2=T3=9, RESET=31)
         # TEST8 lossy
         arr = read(DATA / "T8SSE3.JLS")
         assert np.allclose(arr, TEST8, atol=3)
@@ -165,9 +165,10 @@ def test_decode(TEST8):
 
 def test_decode_buffer(TEST8):
     with open(DATA / "T8C1E0.JLS", "rb") as f:
-        buffer = decode_from_buffer(f.read())
-        arr = np.frombuffer(buffer, dtype="u1")
-        arr = arr.reshape(256, 256, 3)
+        buffer, info = decode_from_buffer(f.read())
+        bytes_per_sample = info["bits_per_sample"] // 8
+        arr = np.frombuffer(buffer, dtype=f"u{bytes_per_sample}")
+        arr = arr.reshape(info["height"], info["width"], info["components"])
         assert np.array_equal(arr, TEST8)
 
 

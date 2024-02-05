@@ -1,3 +1,6 @@
+
+from typing import Union
+
 import numpy as np
 
 import _CharLS
@@ -19,12 +22,12 @@ def write(fname, data_image):
         f.write(data_buffer.tobytes())
 
 
-def encode(data_image):
+def encode(data_image, lossy_error: int = 0, interleave_mode: Union[int, None] = None):
     """Encode grey-scale image via JPEG-LS using CharLS implementation."""
     if data_image.dtype == np.uint16 and np.max(data_image) <= 255:
         data_image = data_image.astype(np.uint8)
 
-    return _CharLS.encode(data_image)
+    return _CharLS.encode(data_image, lossy_error, interleave_mode)
 
 
 def decode(data_buffer):
